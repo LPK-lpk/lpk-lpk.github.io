@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.lpk_lpk.twa",
+        "sha256_cert_fingerprints": ["1F:A1:64:50:A8:F1:C3:7B:46:10:0B:4F:24:BD:8F:CA:C0:DC:64:7F:88:19:B8:B1:6A:DD:DD:1F:A6:9C:46:15"]
+      }
+    }]
