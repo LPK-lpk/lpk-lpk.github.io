@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Painel · Inglês Live</title>
+<style>
+:root{--bg:#fafaf9;--panel:#fff;--soft:#f4f4f2;--line:#e7e5e4;--txt:#1c1917;--mut:#78716c;--acc:#3f6f8f;--on-acc:#fff;--ok:#4d8a6a;--bad:#b4533c}
+@media (prefers-color-scheme:dark){:root{--bg:#141414;--panel:#1c1c1e;--soft:#232326;--line:#2f2f33;--txt:#ececec;--mut:#9a9a9f;--acc:#8fb4cf;--on-acc:#10151a;--ok:#7fbf9e;--bad:#e08a73}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:20px;margin:0 0 4px}
+p.sub{color:var(--mut);margin:0 0 18px;font-size:14px}
+input,button{font:inherit;color:var(--txt);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+input{width:100%}
+button{cursor:pointer}button:hover{border-color:var(--acc)}
+button.p{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
+button.d{color:var(--bad)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row input{flex:1;min-width:140px}
+label.l{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--mut);margin-top:10px}
+label.l input{width:auto}
+.al{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line)}
+.al:first-of-type{border-top:0}
+.al .n{font-weight:600;min-width:90px}
+.al code{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:3px 8px;font-size:15px;letter-spacing:.04em}
+.al .u{color:var(--mut);font-size:13px;flex:1;min-width:90px}
+.al .b{display:flex;gap:6px;flex-wrap:wrap}
+.al button{padding:6px 10px;font-size:14px}
+#msg{min-height:22px;font-size:14px;margin:6px 0}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
+.novo{border-color:var(--ok)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <h1>🎙️ Painel · Inglês Live</h1>
+  <p class="sub">Área do professor: crie e gerencie os códigos de acesso dos alunos.</p>
+
+  <section id="login" class="box">
+    <label for="senha"><b>Senha do painel</b></label>
+    <div class="row" style="margin-top:8px"><input id="senha" type="password" autocomplete="current-password" placeholder="Sua senha de professor"><button id="entrar" class="p">Entrar</button></div>
+    <label class="l"><input id="lembrar" type="checkbox"> Lembrar neste aparelho (use só no seu)</label>
+  </section>
+
+  <section id="app" hidden>
+    <div class="box">
+      <b>Novo aluno</b>
+      <div class="row" style="margin-top:8px"><input id="nome" placeholder="nome do aluno (ex.: maria)" autocapitalize="none" autocomplete="off" spellcheck="false"><button id="criar" class="p">Gerar código</button></div>
+      <div style="color:var(--mut);font-size:13px;margin-top:6px">Letras minúsculas sem acento, números, - ou _ (2 a 20 caracteres).</div>
+    </div>
+    <div class="box" id="lista"><b>Alunos</b><div id="alunos"></div></div>
+    <button id="sair">Sair</button>
+  </section>
+  <div id="msg" role="status" aria-live="polite"></div>
+</main>
+<script>
+// Endereço do Worker do Inglês Live e do app dos alunos
+const API = "https://ingles-live.leonaldopet.workers.dev/admin";
+const APP = "https://ingles-live-app.leonaldopet.workers.dev";
+const $ = id => document.getElementById(id);
+const store = { get(k) { try { return localStorage.getItem(k) || ""; } catch { return ""; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} }, del(k) { try { localStorage.removeItem(k); } catch {} } };
+let senha = "", limite = 150;
+
+const msg = (t, cls) => { $("msg").className = cls || ""; $("msg").textContent = t || ""; };
+async function chamar(corpo) {
+  let r;
+  try { r = await fetch(API, { method: "POST", headers: { "content-type": "application/json", "x-admin": senha }, body: JSON.stringify(corpo) }); }
+  catch { throw new Error("Sem conexão com o servidor. Verifique a internet."); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error({ "senha invalida": "Senha incorreta.", "origem nao permitida": "Este endereço do painel não está autorizado no servidor.", "esse nome ja existe": "Esse nome já existe. Escolha outro ou troque o código dele." }[j.erro] || j.erro || "Erro " + r.status);
+  return j;
+}
+const convite = (n, c) => "Olá, " + n + "! Seu código do Inglês Live é: " + c + "\nAcesse: " + APP;
+async function copiar(texto, ok) { try { await navigator.clipboard.writeText(texto); msg(ok, "ok"); } catch { msg("Não consegui copiar. Selecione e copie à mão: " + texto, "bad"); } }
+
+function linha(a, destaque) {
+  const d = document.createElement("div"); d.className = "al" + (destaque ? " novo" : "");
+  const n = document.createElement("span"); n.className = "n"; n.textContent = a.nome;
+  const c = document.createElement("code"); c.textContent = a.codigo;
+  const u = document.createElement("span"); u.className = "u"; u.textContent = a.usoHoje + " de " + limite + " mensagens hoje";
+  const b = document.createElement("span"); b.className = "b";
+  const bt = (t, f, cls) => { const x = document.createElement("button"); x.textContent = t; if (cls) x.className = cls; x.onclick = f; b.append(x); };
+  bt("Copiar convite", () => copiar(convite(a.nome, a.codigo), "Convite de " + a.nome + " copiado. Cole no WhatsApp."));
+  bt("Trocar código", async () => { if (!confirm("Trocar o código de " + a.nome + "? O código antigo deixa de valer.")) return; try { const r = await chamar({ acao: "trocar", nome: a.nome }); msg("Novo código de " + a.nome + ": " + r.codigo, "ok"); await carregar(a.nome); } catch (e) { msg(e.message, "bad"); } });
+  bt("Remover", async () => { if (!confirm("Remover " + a.nome + "? Ele perde o acesso.")) return; try { await chamar({ acao: "remover", nome: a.nome }); msg(a.nome + " removido.", "ok"); await carregar(); } catch (e) { msg(e.message, "bad"); } }, "d");
+  d.append(n, c, u, b); return d;
+}
+async function carregar(destacar) {
+  const r = await chamar({ acao: "listar" }); limite = r.limite;
+  const box = $("alunos"); box.textContent = "";
+  if (!r.alunos.length) { box.textContent = "Nenhum aluno ainda."; return; }
+  r.alunos.sort((x, y) => x.nome.localeCompare(y.nome)).forEach(a => box.append(linha(a, a.nome === destacar)));
+}
+function mostrar(logado) { $("login").hidden = logado; $("app").hidden = !logado; }
+
+async function entrar() {
+  senha = $("senha").value.trim(); if (!senha) return msg("Digite a senha.", "bad");
+  msg("Entrando…");
+  try { await carregar(); mostrar(true); msg(""); if ($("lembrar").checked) store.set("senha", senha); } catch (e) { senha = ""; msg(e.message, "bad"); }
+}
+$("entrar").onclick = entrar; $("senha").onkeydown = e => { if (e.key === "Enter") entrar(); };
+$("criar").onclick = async () => {
+  const nome = $("nome").value.trim().toLowerCase(); if (!nome) return msg("Digite o nome do aluno.", "bad");
+  try { const r = await chamar({ acao: "criar", nome }); $("nome").value = ""; msg("Código de " + r.nome + ": " + r.codigo + " (toque em “Copiar convite”).", "ok"); await carregar(r.nome); } catch (e) { msg(e.message, "bad"); }
+};
+$("nome").onkeydown = e => { if (e.key === "Enter") $("criar").onclick(); };
+$("sair").onclick = () => { senha = ""; store.del("senha"); $("senha").value = ""; mostrar(false); msg(""); };
+if (store.get("senha")) { $("senha").value = store.get("senha"); $("lembrar").checked = true; entrar(); }
+</script>
+</body>
+</html>
