@@ -31,6 +31,10 @@ label.l input{width:auto}
 .al .u{color:var(--mut);font-size:13px;flex:1;min-width:90px}
 .al .b{display:flex;gap:6px;flex-wrap:wrap}
 .al button{padding:6px 10px;font-size:14px}
+label.c{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mut);flex:1;min-width:150px}
+.tag{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--mut)}
+.tag.bad{color:var(--bad);border-color:var(--bad)}
+.ed{flex-basis:100%;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;background:var(--soft);border-radius:10px;padding:10px}
 #msg{min-height:22px;font-size:14px;margin:6px 0}
 .ok{color:var(--ok)}.bad{color:var(--bad)}
 .novo{border-color:var(--ok)}
@@ -52,7 +56,11 @@ label.l input{width:auto}
     <div class="box">
       <b>Novo aluno</b>
       <div class="row" style="margin-top:8px"><input id="nome" placeholder="nome do aluno (ex.: maria)" autocapitalize="none" autocomplete="off" spellcheck="false"><button id="criar" class="p">Gerar código</button></div>
-      <div style="color:var(--mut);font-size:13px;margin-top:6px">Letras minúsculas sem acento, números, - ou _ (2 a 20 caracteres).</div>
+      <div class="row" style="margin-top:8px">
+        <label class="c">Acesso até (opcional)<input id="novoate" type="date"></label>
+        <label class="c">Mensagens por dia (opcional)<input id="novolim" type="number" min="1" max="2000" placeholder="padrão"></label>
+      </div>
+      <div style="color:var(--mut);font-size:13px;margin-top:6px">Nome: letras minúsculas sem acento, números, - ou _ (2 a 20). Deixe data e limite em branco para usar o padrão (sem data final).</div>
     </div>
     <div class="box" id="lista"><b>Alunos</b><div id="alunos"></div></div>
     <button id="sair">Sair</button>
@@ -73,23 +81,36 @@ async function chamar(corpo) {
   try { r = await fetch(API, { method: "POST", headers: { "content-type": "application/json", "x-admin": senha }, body: JSON.stringify(corpo) }); }
   catch { throw new Error("Sem conexão com o servidor. Verifique a internet."); }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error({ "senha invalida": "Senha incorreta.", "origem nao permitida": "Este endereço do painel não está autorizado no servidor.", "esse nome ja existe": "Esse nome já existe. Escolha outro ou troque o código dele." }[j.erro] || j.erro || "Erro " + r.status);
+  if (!r.ok) throw new Error({ "senha invalida": "Senha incorreta.", "origem nao permitida": "Este endereço do painel não está autorizado no servidor.", "esse nome ja existe": "Esse nome já existe. Escolha outro ou troque o código dele.", "data invalida (use AAAA-MM-DD)": "Data inválida.", "limite invalido (1 a 2000)": "O limite precisa ser um número de 1 a 2000." }[j.erro] || j.erro || "Erro " + r.status);
   return j;
 }
-const convite = (n, c) => "Olá, " + n + "! Seu código do Inglês Live é: " + c + "\nAcesse: " + APP;
 async function copiar(texto, ok) { try { await navigator.clipboard.writeText(texto); msg(ok, "ok"); } catch { msg("Não consegui copiar. Selecione e copie à mão: " + texto, "bad"); } }
 
+const dataBR = d => d.slice(8, 10) + "/" + d.slice(5, 7) + "/" + d.slice(0, 4);
+const convite = (n, c, ate) => "Olá, " + n + "! Seu código do Inglês Live é: " + c + "\nAcesse: " + APP + (ate ? "\nAcesso até " + dataBR(ate) : "");
 function linha(a, destaque) {
   const d = document.createElement("div"); d.className = "al" + (destaque ? " novo" : "");
   const n = document.createElement("span"); n.className = "n"; n.textContent = a.nome;
   const c = document.createElement("code"); c.textContent = a.codigo;
-  const u = document.createElement("span"); u.className = "u"; u.textContent = a.usoHoje + " de " + limite + " mensagens hoje";
+  const u = document.createElement("span"); u.className = "u"; u.textContent = a.usoHoje + " de " + a.limiteEfetivo + " mensagens hoje";
+  const tags = document.createElement("span"); tags.className = "u";
+  const tag = (t, cls) => { const x = document.createElement("span"); x.className = "tag " + (cls || ""); x.textContent = t; tags.append(x, " "); };
+  if (a.encerrado) tag("ENCERRADO em " + dataBR(a.ate), "bad"); else if (a.ate) tag("até " + dataBR(a.ate)); else tag("sem data final");
+  if (a.limite) tag(a.limite + "/dia (próprio)");
   const b = document.createElement("span"); b.className = "b";
   const bt = (t, f, cls) => { const x = document.createElement("button"); x.textContent = t; if (cls) x.className = cls; x.onclick = f; b.append(x); };
-  bt("Copiar convite", () => copiar(convite(a.nome, a.codigo), "Convite de " + a.nome + " copiado. Cole no WhatsApp."));
+  bt("Copiar convite", () => copiar(convite(a.nome, a.codigo, a.encerrado ? "" : a.ate), "Convite de " + a.nome + " copiado. Cole no WhatsApp."));
+  bt("Editar", () => ed.hidden = !ed.hidden);
   bt("Trocar código", async () => { if (!confirm("Trocar o código de " + a.nome + "? O código antigo deixa de valer.")) return; try { const r = await chamar({ acao: "trocar", nome: a.nome }); msg("Novo código de " + a.nome + ": " + r.codigo, "ok"); await carregar(a.nome); } catch (e) { msg(e.message, "bad"); } });
   bt("Remover", async () => { if (!confirm("Remover " + a.nome + "? Ele perde o acesso.")) return; try { await chamar({ acao: "remover", nome: a.nome }); msg(a.nome + " removido.", "ok"); await carregar(); } catch (e) { msg(e.message, "bad"); } }, "d");
-  d.append(n, c, u, b); return d;
+  const ed = document.createElement("div"); ed.className = "ed"; ed.hidden = true;
+  const campo = (rot, tipo, val, ph) => { const l = document.createElement("label"); l.className = "c"; l.append(rot); const i = document.createElement("input"); i.type = tipo; i.value = val || ""; if (ph) i.placeholder = ph; if (tipo === "number") { i.min = 1; i.max = 2000; } l.append(i); ed.append(l); return i; };
+  const iAte = campo("Acesso até (vazio = sem data final)", "date", a.ate), iLim = campo("Mensagens por dia (vazio = padrão)", "number", a.limite, "padrão");
+  const salvar = document.createElement("button"); salvar.className = "p"; salvar.textContent = "Salvar";
+  salvar.onclick = async () => { try { await chamar({ acao: "definir", nome: a.nome, ate: iAte.value, limite: iLim.value === "" ? "" : Number(iLim.value) }); msg("Ajustes de " + a.nome + " salvos.", "ok"); await carregar(a.nome); } catch (e) { msg(e.message, "bad"); } };
+  const canc = document.createElement("button"); canc.textContent = "Cancelar"; canc.onclick = () => ed.hidden = true;
+  ed.append(salvar, canc);
+  d.append(n, c, u, tags, b, ed); return d;
 }
 async function carregar(destacar) {
   const r = await chamar({ acao: "listar" }); limite = r.limite;
@@ -107,7 +128,8 @@ async function entrar() {
 $("entrar").onclick = entrar; $("senha").onkeydown = e => { if (e.key === "Enter") entrar(); };
 $("criar").onclick = async () => {
   const nome = $("nome").value.trim().toLowerCase(); if (!nome) return msg("Digite o nome do aluno.", "bad");
-  try { const r = await chamar({ acao: "criar", nome }); $("nome").value = ""; msg("Código de " + r.nome + ": " + r.codigo + " (toque em “Copiar convite”).", "ok"); await carregar(r.nome); } catch (e) { msg(e.message, "bad"); }
+  try { const extra = {}; if ($("novoate").value) extra.ate = $("novoate").value; if ($("novolim").value) extra.limite = Number($("novolim").value);
+    const r = await chamar({ acao: "criar", nome, ...extra }); $("nome").value = ""; $("novoate").value = ""; $("novolim").value = ""; msg("Código de " + r.nome + ": " + r.codigo + " (toque em “Copiar convite”).", "ok"); await carregar(r.nome); } catch (e) { msg(e.message, "bad"); }
 };
 $("nome").onkeydown = e => { if (e.key === "Enter") $("criar").onclick(); };
 $("sair").onclick = () => { senha = ""; store.del("senha"); $("senha").value = ""; mostrar(false); msg(""); };
