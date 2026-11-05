@@ -39,6 +39,14 @@ label.c{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mu
 .ok{color:var(--ok)}.bad{color:var(--bad)}
 .novo{border-color:var(--ok)}
 [hidden]{display:none!important}
+/* ---- Botões coloridos: uma cor por função ---- */
+:root{--c-azul:#2563eb;--c-verde:#15803d;--c-ambar:#b45309;--c-roxo:#7c3aed;--c-verm:#dc2626;--on-c:#fff}
+@media (prefers-color-scheme:dark){:root{--c-azul:#60a5fa;--c-verde:#4ade80;--c-ambar:#fbbf24;--c-roxo:#a78bfa;--c-verm:#f87171;--on-c:#10151a}}
+#entrar,#criar,.ed .p,.al .b button{border-color:transparent;font-weight:600;background:var(--c);color:var(--on-c);transition:filter .15s,transform .1s}
+#entrar,#criar,.ed .p{--c:var(--c-verde)}
+.al .b button:nth-child(1){--c:var(--c-azul)} .al .b button:nth-child(2){--c:var(--c-ambar)} .al .b button:nth-child(3){--c:var(--c-roxo)} .al .b button:nth-child(4){--c:var(--c-verm)}
+#entrar:hover,#criar:hover,.ed .p:hover,.al .b button:hover{filter:brightness(1.1);border-color:transparent}
+button:active{transform:scale(.97)}
 </style>
 </head>
 <body>
